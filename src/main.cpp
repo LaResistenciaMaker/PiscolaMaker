@@ -1,4 +1,11 @@
-#include <Arduino.h>
+/*
+ *
+ * Piscola maker
+ * 
+ * v0.1
+ * Nothing tested, only pure code
+ *
+ */#include <Arduino.h>
 #include <ArduinoLog.h>
 #include <ArduinoJson.h>
 #include <StreamUtils.h>
@@ -106,10 +113,10 @@ enum task_status{
 
 #define DISPENSERS_AVAILABLE 2
 #define DRINK_MAX_INSTRUCTIONS 10
-#define DRINK_SIZE_OF_INSTRUCTION 4
 
 #define DRINKS_QUEUE_MAX_LEN 20
 
+//Status of all piscolaMaker
 enum global_status{
   IDLE,
   DISPENSING,
@@ -140,31 +147,15 @@ int hw_dispensers_set_pins[] = {
   hw_dispenser_2_set_pin
 };
 
-//Not used
-enum drink_type{
-  PISCO_PURO,
-  COCA_PURO,
-  PISCOLA_LIGERA,
-  PISCOLA_MEDIA,
-  PISCOLA_PAPITAS,
-  CUSTOM,
-  NOT_SPECIFIED
-};
-
-
 String status_names[] = {
   "IDLE",
   "DISPENSING",
   "UPDATING"
 };
-String drink_names[] = {
-  "Pisco_puro",
-  "COCA_PURO",
-  "PISCOLA_LIGERA",
-  "PISCOLA_MEDIA",
-  "PISCOLA_PAPITAS",
-  "CUSTOM",
-  "NOT_SPECIFIED"
+
+char* dispenser_names[] = {
+  "PISCO",
+  "COCACOLA"
 };
 
 global_status act_status = IDLE;
@@ -286,18 +277,13 @@ void handleQuery(){
         e_drink["status"] = selected->status;
         e_drink["n_instructions"] = selected->n_instructions;
         auto array = e_drink.createNestedArray("instructions");
-        char inst[20];
-        for (int instruction = 0; instruction < drink_queue.queueLen; instruction+=DRINK_SIZE_OF_INSTRUCTION)
+        char inst[40];
+        for (int instruction = 0; instruction < drink_queue.queueLen; instruction++)
         {
-          /*
-            * server
-            * start
-            * len
-            * end
-            */
-          snprintf(inst,20,"%i,%i,%i",selected->instructions[instruction],\
-                                      selected->instructions[instruction+1],\
-                                      selected->instructions[instruction+2]);
+          memset(inst,0,sizeof(inst));
+          snprintf(inst,sizeof(inst),"%i,%i,%s",selected->instructions[instruction].start,\
+                                      selected->instructions[instruction].len,\
+                                      dispenser_names[selected->instructions[instruction].dispenser]);
           array.add(inst);
         }
       }
@@ -339,14 +325,14 @@ void handleServe(){
           payload["status"] = 400;
           payload["reason"] = "too_much_instructions";
         } else {
-          int original_instruction = 0;
+          int payload_instruction = 0;
           newDrink->n_instructions = instruction_count;
-          for (int instruction = 0; instruction < instruction_count; instruction+=DRINK_SIZE_OF_INSTRUCTION){
-            newDrink->instructions[instruction].dispenser = (dispensers_available)atoi(payload["instructions"][original_instruction][0]); //dispenser
-            newDrink->instructions[instruction].start = atoi(payload["instructions"][original_instruction][1]); //start
-            newDrink->instructions[instruction].len = atoi(payload["instructions"][original_instruction][2]); //len
+          for (int instruction = 0; instruction < instruction_count; instruction++){
+            newDrink->instructions[instruction].dispenser = (dispensers_available)atoi(payload["instructions"][payload_instruction][0]); //dispenser
+            newDrink->instructions[instruction].start = atoi(payload["instructions"][payload_instruction][1]); //start
+            newDrink->instructions[instruction].len = atoi(payload["instructions"][payload_instruction][2]); //len
             newDrink->instructions[instruction].end = 0;
-            original_instruction++;
+            payload_instruction++;
           }
           online_request = true;
           payload["status"] = 200;
